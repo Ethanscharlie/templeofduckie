@@ -1,0 +1,204 @@
+#pragma once
+#include "Charlie2D.h"
+#include "Components.h"
+#include "Creaters.h"
+#include "EntityBox.h"
+#include "ExtendedComponent.h"
+#include "GameManager.h"
+#include "Math.h"
+#include "Scheduler.h"
+
+#include "DefaultPatterns.h"
+#include "Vector2f.h"
+#include <string>
+
+const float droneMoveSpeed = 400.0f;
+const float droneRubberbandDistanceMax = 200.0f;
+const float droneRubberbandDistanceMin = 250.0f;
+
+class Drone : public ExtendedComponent {
+public:
+  void start() override {}
+
+  void update() override {}
+
+  void resetWaitToFire() { waitToFire = randFloat(1500, 4000); }
+
+  void doMovePattern() {
+    BossPatternSystem *drone = get<BossPatternSystem>();
+    entity->get<Drone>()->resetWaitToFire();
+
+    entity->add<Scheduler>()->addSchedule(
+        "WaitToFire", entity->get<Drone>()->waitToFire,
+        [this, drone]() { drone->nextPattern(); },
+        [this]() { entity->get<Scheduler>()->removeSchedule("Move"); }, true);
+
+    entity->add<Scheduler>()->addSchedule(
+        "Move", 0,
+        [this, drone]() {
+          Vector2f playerCenter = GameManager::getComponents<Player>()[0]
+                                      ->entity->get<entityBox>()
+                                      ->getBox()
+                                      .getCenter();
+          entity->get<Sprite>()->angle.lookAt(
+              entity->get<entityBox>()->getBox().getCenter(), playerCenter);
+          if (playerCenter.dist(
+                  entity->get<entityBox>()->getBox().getCenter()) >
+              droneRubberbandDistanceMax) {
+            entity->get<entityBox>()->changePosition(
+                entity->get<Sprite>()->angle.getVector() * droneMoveSpeed *
+                GameManager::deltaTime);
+          }
+
+          if (playerCenter.dist(
+                  entity->get<entityBox>()->getBox().getCenter()) <
+              droneRubberbandDistanceMin) {
+            entity->get<entityBox>()->changePosition(
+                entity->get<Sprite>()->angle.getVector() * -droneMoveSpeed *
+                0.7f * GameManager::deltaTime);
+          }
+        },
+        [this, drone]() {}, false);
+  }
+
+  float waitToFire;
+};
+
+void createDrone() {
+  Vector2f possibleSpawns[4] = {LDTK::worldBox.getTopRightCorner(),
+                                LDTK::worldBox.getTopLeftCorner(),
+                                LDTK::worldBox.getBottomRightCorner(),
+                                LDTK::worldBox.getBottomLeftCorner()};
+
+  Entity *entity = GameManager::createEntity("Drone");
+  entity->add<Sprite>()->loadTexture("img/Drone.png");
+  entity->get<entityBox>()->setScale({70, 40});
+  entity->add<Drone>();
+
+  entity->add<entityBox>()->setWithCenter(getRandomElement(possibleSpawns));
+  BossPatternSystem *drone = entity->add<BossPatternSystem>();
+
+  drone->patterns.push_back(
+      [entity, drone]() { entity->get<Drone>()->doMovePattern(); });
+
+  doBreakPattern(entity, 500);
+
+  drone->patterns.push_back([entity, drone]() {
+    float attackType = randFloat(0, 10);
+    if (attackType > 5) {
+      entity->get<Scheduler>()->addSchedule(
+          "NormalFire", 200,
+          [entity, drone]() {
+            createDirectionalBullet(
+                entity->get<entityBox>()->getBox().getCenter(),
+                entity->get<Sprite>()->angle);
+          },
+          [drone]() { drone->nextPattern(); }, true, 3);
+    } else {
+      entity->get<entityBox>()->setWithCenter(
+          {randFloat(LDTK::worldBox.getLeft(), LDTK::worldBox.getRight()),
+           randFloat(LDTK::worldBox.getTop(), LDTK::worldBox.getBottom())});
+
+      entity->add<Scheduler>()->addSchedule(
+          "Break2", 1500, []() {}, [entity]() { doCirclePattern(entity, 6); },
+          true);
+    }
+  });
+
+  doBreakPattern(entity, 1000);
+
+  drone->patterns[0]();
+}
+
+class FirstBoss : public ExtendedComponent {
+public:
+  const float rotateSpeed = 70.0f;
+  const float moveSpeed = 200.0f;
+  const int activeDrones = 4;
+  const float droneSpawnTimeMilliseconds = 1000;
+
+  void start() override {
+    for (int i = 0; i < activeDrones; i++)
+      createDrone();
+
+    BossPatternSystem *bps = get<BossPatternSystem>();
+    Scheduler *scheduler = add<Scheduler>();
+    bps->patterns.push_back([this, scheduler, bps]() {
+      moving = true;
+      scheduler->addSchedule("StopMove", 2000, [this, bps]() {
+        moving = false;
+        bps->nextPattern();
+      });
+    });
+
+    doBreakPattern(entity, 1000);
+
+    bps->patterns[0]();
+  }
+
+  void handleDrones() {
+    Scheduler *scheduler = add<Scheduler>();
+    auto drones = GameManager::getComponents<Drone>();
+    int amountOfDronesKilled = activeDrones - drones.size();
+    for (int i = 0; i < amountOfDronesKilled; i++) {
+      scheduler->addSchedule(std::to_string(i), droneSpawnTimeMilliseconds,
+                             []() { std::cout << "Create Drone\n"; createDrone(); }, [](){}, true);
+    }
+  }
+
+  void handleMovement() {
+    Entity *player = GameManager::getEntities("Player")[0];
+    entityBox *playerBox = player->get<entityBox>();
+    Angle &angle = moveAngle;
+    int rotateDirection = 1;
+
+    Angle directAngle = Angle();
+    directAngle.lookAt(entity->get<entityBox>()->getBox().getCenter(),
+                       playerBox->getBox().getCenter());
+    directAngle.rotate(90);
+
+    Vector2f vectorDiff = directAngle.getVector() - angle.getVector();
+    // Determine rotation direction
+    float crossProduct =
+        angle.getVector().x * vectorDiff.y - angle.getVector().y * vectorDiff.x;
+    if (crossProduct > 0) {
+      rotateDirection = 1; // Rotate counterclockwise
+    } else if (crossProduct < 0) {
+      rotateDirection = -1; // Rotate clockwise
+    }
+
+    angle.rotate(rotateDirection * rotateSpeed * GameManager::deltaTime);
+
+    Angle moveAngle = Angle(angle);
+    moveAngle.rotate(-90);
+
+    if (moving)
+      entity->get<entityBox>()->changePosition(
+          moveAngle.getVector() * moveSpeed * GameManager::deltaTime);
+  }
+
+  void update() override {
+    handleMovement();
+    handleDrones();
+  }
+
+private:
+  bool moving = false;
+  Angle moveAngle;
+};
+
+void createFirstBoss(Vector2f position = GameManager::gameWindowSize / 2 -
+                                         Vector2f(500, 0)) {
+  Entity *entity = GameManager::createEntity("FirstBoss");
+  entity->add<Sprite>()->loadTexture("img/bossbody.png");
+  entity->add<BossPatternSystem>();
+  entity->add<FirstBoss>();
+
+  Box setBox = GameManager::getEntities("TheFirstBossSpawn")[0]
+                   ->get<entityBox>()
+                   ->getBox();
+  entity->get<entityBox>()->setSize(setBox.size);
+  entity->get<entityBox>()->setPosition(setBox.position);
+  entity->useLayer = true;
+  entity->layer = -1;
+}

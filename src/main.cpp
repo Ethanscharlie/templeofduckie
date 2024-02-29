@@ -1,12 +1,78 @@
 #include "Charlie2D.h"
+#include "ExtendedComponent.h"
+#include "SDL_render.h"
+
+bool playerCreated = false;
 
 void loadGameScene();
 void loadMenuScene();
 
+class PinCameraTo : public ExtendedComponent {
+public:
+  void update() override {
+    Camera::setPosition(entity->box->getBox().getCenter());
+  }
+};
+
+class PlayerAnimator : public ExtendedComponent {
+public:
+  // void start() override {}
+  void update() override {
+    int direction = InputManager::checkHorizontal();
+    bool facingRight = direction > 0;
+    bool facingLeft = direction < 0;
+
+    if (facingRight) {
+      get<Sprite>()->flip = SDL_FLIP_NONE;
+    } else if (facingLeft) {
+      get<Sprite>()->flip = SDL_FLIP_HORIZONTAL;
+    }
+  }
+};
+
+class PlayerLevelChange : public ExtendedComponent {
+  std::string l;
+  void update() override {
+    if (LDTK::checkOutsideBounds(entity)) {
+      l = LDTK::findTraveledLevel(entity);
+      LDTK::loadLevel(l);
+    }
+    // entity->box->getPosition().print();
+  }
+};
+
+Entity *createPlayer(Entity *spawn) {
+  Entity *player = GameManager::createEntity("Player");
+  player->box->setPosition(spawn->box->getPosition());
+  player->box->setSize(spawn->box->getSize());
+
+  Sprite *sprite = player->add<Sprite>();
+  sprite->loadTexture("img/Player.png", false);
+
+  player->useLayer = true;
+  player->layer = 20;
+
+  JumpMan *jumpMan = player->add<JumpMan>();
+  jumpMan->gravity = (float)1500 / 2;
+  jumpMan->speed = (float)40 / 2;
+  jumpMan->airSpeed = (float)40 / 2;
+  jumpMan->maxSpeed = (float)200 / 2;
+  jumpMan->tracktion = (float)1000 / 2;
+  jumpMan->jumpPeak = (float)80 / 2;
+  jumpMan->jumpChange = (float)300 / 2;
+
+  player->add<PinCameraTo>();
+  player->add<PlayerAnimator>();
+  player->add<PlayerLevelChange>();
+
+  playerCreated = true;
+  return player;
+}
+
 void loadGameScene() {
   GameManager::destroyAll();
   Camera::resetCamera();
-  Camera::scale = 2;
+  Camera::scale = 4;
 
   LDTK::loadJson("img/ldtk/ldtk.ldtk");
 
@@ -14,12 +80,14 @@ void loadGameScene() {
     for (Entity *entity : GameManager::getAllObjects()) {
       if (entity->tag == "Ground") {
         entity->add<Collider>()->solid = true;
+      } else if (entity->tag == "PlayerSpawn") {
+        if (!playerCreated)
+          createPlayer(entity);
       }
     }
   };
 
-  // Load a specific level using its ID
-  LDTK::loadLevel("c4217370-b0a0-11ee-9036-7938393bcf38");
+  LDTK::loadLevel("78b44ad0-b0a0-11ee-b472-39fdb7fc8f8c");
 }
 
 int main(int, char **) {
