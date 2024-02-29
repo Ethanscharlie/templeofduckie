@@ -1,6 +1,8 @@
 #include "Charlie2D.h"
 #include "ExtendedComponent.h"
+#include "GameManager.h"
 #include "SDL_render.h"
+#include "Vector2f.h"
 
 bool playerCreated = false;
 
@@ -16,7 +18,6 @@ public:
 
 class PlayerAnimator : public ExtendedComponent {
 public:
-  // void start() override {}
   void update() override {
     int direction = InputManager::checkHorizontal();
     bool facingRight = direction > 0;
@@ -31,13 +32,31 @@ public:
 };
 
 class PlayerLevelChange : public ExtendedComponent {
-  std::string l;
+public:
   void update() override {
     if (LDTK::checkOutsideBounds(entity)) {
-      l = LDTK::findTraveledLevel(entity);
-      LDTK::loadLevel(l);
+      level = LDTK::findTraveledLevel(entity);
+      lastEnterPosition = entity->box->getPosition();
+      LDTK::loadLevel(level);
     }
-    // entity->box->getPosition().print();
+  }
+
+  void resetPlayer() { entity->box->setPosition(lastEnterPosition); }
+
+  std::string level;
+  Vector2f lastEnterPosition = {0, 0};
+};
+
+class Kill : public ExtendedComponent {
+public:
+  void start() override {}
+
+  void update() override {
+    Entity *player = GameManager::getEntities("Player")[0];
+
+    if (entity->box->getBox().checkCollision(player->box->getBox())) {
+      player->get<PlayerLevelChange>()->resetPlayer();
+    }
   }
 };
 
@@ -80,6 +99,8 @@ void loadGameScene() {
     for (Entity *entity : GameManager::getAllObjects()) {
       if (entity->tag == "Ground") {
         entity->add<Collider>()->solid = true;
+      } else if (entity->tag == "Kill") {
+        entity->add<Kill>();
       } else if (entity->tag == "PlayerSpawn") {
         if (!playerCreated)
           createPlayer(entity);
