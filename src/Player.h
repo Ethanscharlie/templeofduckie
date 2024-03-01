@@ -1,4 +1,5 @@
 #pragma once
+#include "ExtendedComponent.h"
 #include "physicsBody.h"
 #include <Charlie2D.h>
 #include <cstdlib>
@@ -25,13 +26,12 @@ public:
       get<Sprite>()->flip = SDL_FLIP_HORIZONTAL;
     }
 
-    if (direction != 0 && abs(get<physicsBody>()->velocity.y) <= 0.1 ) {
+    if (direction != 0 && abs(get<physicsBody>()->velocity.y) <= 0.1) {
       Animation *runAnimation = get<Sprite>()->animations["run"];
       if (!runAnimation->playing) {
         runAnimation->play();
       }
-    } 
-    else {
+    } else {
       get<Sprite>()->loadTexture("img/Player.png", false);
     }
   }
@@ -51,6 +51,32 @@ public:
 
   std::string level;
   Vector2f lastEnterPosition = {0, 0};
+};
+
+class Dash : public ExtendedComponent {
+  void update() override {
+    if (InputManager::checkInput("dash")) {
+      if (abs(get<physicsBody>()->velocity.x) < 0.1)
+        return;
+      int dir = 0;
+      if (InputManager::checkInput("right"))
+        dir = 1;
+      if (InputManager::checkInput("left"))
+        dir = -1;
+
+      if (canDash) {
+        Vector2f slide = {InputManager::checkHorizontal() * dashAmount, 0};
+        entity->require<entityBox>()->slide(
+            slide, GameManager::getEntities("Ground"), true, true);
+        canDash = false;
+        add<Scheduler>()->addSchedule(
+            "dash", 400, [&]() { canDash = true; }, []() {}, true);
+      }
+    }
+  }
+
+  const float dashAmount = 60.0f;
+  bool canDash = true;
 };
 
 Entity *createPlayer(Entity *spawn) {
@@ -74,7 +100,7 @@ Entity *createPlayer(Entity *spawn) {
           "/home/ethanscharlie/Projects/Code/C++/CharlieGames/"
           "templeofduckie/img/Animations/Player/pixil-frame-3.png",
       },
-      75.0f/1000);
+      75.0f / 1000);
 
   player->useLayer = true;
   player->layer = 20;
@@ -93,6 +119,8 @@ Entity *createPlayer(Entity *spawn) {
   player->add<PinCameraTo>();
   player->add<PlayerAnimator>();
   player->add<PlayerLevelChange>();
+
+  player->add<Dash>();
 
   playerCreated = true;
   return player;
