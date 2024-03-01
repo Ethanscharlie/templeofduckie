@@ -53,32 +53,6 @@ public:
   Vector2f lastEnterPosition = {0, 0};
 };
 
-class Dash : public ExtendedComponent {
-  void update() override {
-    if (InputManager::checkInput("dash")) {
-      if (abs(get<physicsBody>()->velocity.x) < 0.1)
-        return;
-      int dir = 0;
-      if (InputManager::checkInput("right"))
-        dir = 1;
-      if (InputManager::checkInput("left"))
-        dir = -1;
-
-      if (canDash) {
-        Vector2f slide = {InputManager::checkHorizontal() * dashAmount, 0};
-        entity->require<entityBox>()->slide(
-            slide, GameManager::getEntities("Ground"), true, true);
-        canDash = false;
-        add<Scheduler>()->addSchedule(
-            "dash", 400, [&]() { canDash = true; }, []() {}, true);
-      }
-    }
-  }
-
-  const float dashAmount = 60.0f;
-  bool canDash = true;
-};
-
 Entity *createPlayer(Entity *spawn) {
   Entity *player = GameManager::createEntity("Player");
   player->box->setPosition(spawn->box->getPosition());
@@ -112,15 +86,13 @@ Entity *createPlayer(Entity *spawn) {
   jumpMan->maxSpeed = 100.0f;
   jumpMan->tracktion = 500.0f;
 
-  // jumpMan->jumpPeak = 60.0f;
-  jumpMan->jumpPeak = 30.0f;
+  jumpMan->jumpPeak = 60.0f;
+  // jumpMan->jumpPeak = 30.0f;
   jumpMan->jumpChange = 170.0f;
 
   player->add<PinCameraTo>();
   player->add<PlayerAnimator>();
   player->add<PlayerLevelChange>();
-
-  player->add<Dash>();
 
   playerCreated = true;
   return player;

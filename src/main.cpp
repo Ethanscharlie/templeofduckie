@@ -1,3 +1,4 @@
+#include "AbilityData.h"
 #include "Charlie2D.h"
 #include "ExtendedComponent.h"
 #include "GameManager.h"
@@ -16,6 +17,7 @@ public:
 
     if (entity->box->getBox().checkCollision(player->box->getBox())) {
       player->get<PlayerLevelChange>()->resetPlayer();
+      std::cout << "Killed Player\n";
     }
   }
 };
@@ -28,15 +30,48 @@ public:
     Entity *player = GameManager::getEntities("Player")[0];
 
     if (entity->box->getBox().checkCollision(player->box->getBox())) {
-      onPickup();
+      abilityData.onPickup();
       entity->toDestroy = true;
     }
   }
 
-  std::function<void()> onPickup = []() {
-    std::cout << "Somebody forgor to give this an item\n";
-  };
+  AbilityData abilityData;
 };
+
+class MovePoint : public Component {
+public:
+  void update(float deltaTime) override {
+    if (disable)
+      return;
+    Vector2f currentPosition = entity->get<entityBox>()->getBox().getCenter();
+    if (movingToEnd) {
+      // Check Past
+      Vector2f direction = (endPoint - currentPosition).normalize();
+      entity->get<entityBox>()->changePosition(direction * speed * deltaTime);
+
+      if (currentPosition.dist(endPoint) < lowSpeed)
+        movingToEnd = false;
+    } else {
+
+      // Check Past
+      Vector2f direction = (startPoint - currentPosition).normalize();
+      entity->get<entityBox>()->changePosition(direction * speed * deltaTime);
+
+      if (currentPosition.dist(startPoint) < lowSpeed)
+        movingToEnd = true;
+    }
+  }
+
+  bool movingToEnd = true;
+  bool disable = false;
+
+  float speed = 60.0f;
+  Vector2f startPoint;
+  Vector2f endPoint;
+
+  const float lowSpeed = 8;
+};
+
 
 void loadGameScene() {
   GameManager::destroyAll();
@@ -49,21 +84,59 @@ void loadGameScene() {
     for (Entity *entity : GameManager::getAllObjects()) {
       if (entity->tag == "Ground") {
         entity->add<Collider>()->solid = true;
-      } else if (entity->tag == "Kill") {
+      }
+
+      else if (entity->tag == "Kill") {
         entity->add<Kill>();
-      } else if (entity->tag == "PlayerSpawn") {
+      }
+
+      else if (entity->tag == "Lava") {
+        if (!playerCreated ||
+            (playerCreated && !GameManager::getEntities("Player")[0]
+                                   ->checkComponent<StanleyCup>())) {
+          entity->add<Kill>();
+        }
+      }
+
+      else if (entity->tag == "PlayerSpawn") {
         if (!playerCreated)
           createPlayer(entity);
       }
 
-      // Items
-      else if (entity->tag == "HighJump") {
+      else if (entity->tag == "Star") {
+        entity->add<Sprite>()->loadTexture("img/star.png");
+        entity->get<entityBox>()->setScale({14, 14});
+
+        json fields = entity->get<LDTKEntity>()->entityJson["fieldInstances"];
+        if (fields.size() <= 0)
+          return;
+        for (json field : fields) {
+          if (field["__identifier"] == "movePoint" &&
+              !field["__value"].is_null()) {
+            entity->add<MovePoint>()->startPoint =
+                entity->get<entityBox>()->getBox().getCenter();
+
+            Vector2f end = {field["__value"]["cx"], field["__value"]["cy"]};
+            entity->add<MovePoint>()->endPoint = end * 16 + 8;
+          } else if (field["__identifier"] == "moveSpeed") {
+            entity->add<MovePoint>()->speed = (float)field["__value"];
+          }
+
+          if (field["__identifier"] == "movePoint" &&
+              field["__value"].is_null()) {
+            entity->add<MovePoint>()->disable = true;
+          }
+        }
+      }
+
+      // Abilities
+      for (AbilityData abilityData : ABILITY_DATA) {
+        if (entity->tag != abilityData.name)
+          continue;
+
         entity->add<Sprite>()->loadTexture("img/crocks.png", false);
         entity->add<Ability>();
-        entity->get<Ability>()->onPickup = []() {
-          GameManager::getEntities("Player")[0]->get<JumpMan>()->jumpPeak =
-              60.0f;
-        };
+        entity->get<Ability>()->abilityData = abilityData;
       }
     }
   };
