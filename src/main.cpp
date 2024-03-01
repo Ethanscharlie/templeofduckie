@@ -4,8 +4,6 @@
 
 #include "Player.h"
 
-bool playerCreated = false;
-
 void loadGameScene();
 void loadMenuScene();
 
@@ -22,33 +20,23 @@ public:
   }
 };
 
-Entity *createPlayer(Entity *spawn) {
-  Entity *player = GameManager::createEntity("Player");
-  player->box->setPosition(spawn->box->getPosition());
-  player->box->setSize(spawn->box->getSize());
+class Ability : public ExtendedComponent {
+public:
+  void start() override {}
 
-  Sprite *sprite = player->add<Sprite>();
-  sprite->loadTexture("img/Player.png", false);
+  void update() override {
+    Entity *player = GameManager::getEntities("Player")[0];
 
-  player->useLayer = true;
-  player->layer = 20;
+    if (entity->box->getBox().checkCollision(player->box->getBox())) {
+      onPickup();
+      entity->toDestroy = true;
+    }
+  }
 
-  JumpMan *jumpMan = player->add<JumpMan>();
-  jumpMan->gravity = (float)1500 / 2;
-  jumpMan->speed = (float)40 / 2;
-  jumpMan->airSpeed = (float)40 / 2;
-  jumpMan->maxSpeed = (float)200 / 2;
-  jumpMan->tracktion = (float)1000 / 2;
-  jumpMan->jumpPeak = (float)80 / 2;
-  jumpMan->jumpChange = (float)300 / 2;
-
-  player->add<PinCameraTo>();
-  player->add<PlayerAnimator>();
-  player->add<PlayerLevelChange>();
-
-  playerCreated = true;
-  return player;
-}
+  std::function<void()> onPickup = []() {
+    std::cout << "Somebody forgor to give this an item\n";
+  };
+};
 
 void loadGameScene() {
   GameManager::destroyAll();
@@ -66,6 +54,16 @@ void loadGameScene() {
       } else if (entity->tag == "PlayerSpawn") {
         if (!playerCreated)
           createPlayer(entity);
+      }
+
+      // Items
+      else if (entity->tag == "HighJump") {
+        entity->add<Sprite>()->loadTexture("img/crocks.png", false);
+        entity->add<Ability>();
+        entity->get<Ability>()->onPickup = []() {
+          GameManager::getEntities("Player")[0]->get<JumpMan>()->jumpPeak =
+              60.0f;
+        };
       }
     }
   };
