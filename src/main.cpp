@@ -3,10 +3,13 @@
 #include "ExtendedComponent.h"
 #include "GameManager.h"
 
+#include "InputManager.h"
 #include "Player.h"
 
 void loadGameScene();
 void loadMenuScene();
+
+const int TILE_SIZE = 16;
 
 class Kill : public ExtendedComponent {
 public:
@@ -17,6 +20,7 @@ public:
 
     if (entity->box->getBox().checkCollision(player->box->getBox())) {
       player->get<PlayerLevelChange>()->resetPlayer();
+      GameManager::playSound("img/sound/52_Dive_02.wav");
       std::cout << "Killed Player\n";
     }
   }
@@ -31,6 +35,7 @@ public:
 
     if (entity->box->getBox().checkCollision(player->box->getBox())) {
       abilityData.onPickup();
+      GameManager::playSound("img/sound/win sound 1-2.wav");
       entity->toDestroy = true;
     }
   }
@@ -55,7 +60,7 @@ public:
 
       // Check Past
       Vector2f direction = (startPoint - currentPosition).normalize();
-      entity->get<entityBox>()->changePosition(direction * speed * deltaTime);
+      entity->box->changePosition(direction * speed * deltaTime);
 
       if (currentPosition.dist(startPoint) < lowSpeed)
         movingToEnd = true;
@@ -72,6 +77,11 @@ public:
   const float lowSpeed = 8;
 };
 
+class PinToCamera : public Component {
+  void update(float deltaTime) {
+    entity->box->setWithCenter(Camera::getPosition());
+  }
+};
 
 void loadGameScene() {
   GameManager::destroyAll();
@@ -81,6 +91,21 @@ void loadGameScene() {
   LDTK::loadJson("img/ldtk/ldtk.ldtk");
 
   LDTK::onLoadLevel = []() {
+    // Removes previeus background and maybe more if something weird happened
+    for (Entity *entity : GameManager::getEntities("Background")) {
+      entity->toDestroy = true;
+    }
+
+    Entity *background = GameManager::createEntity("Background");
+    background->add<Sprite>()->loadTexture("img/background.png");
+
+    background->get<entityBox>()->setScale(LDTK::worldBox.size);
+    background->get<entityBox>()->setPosition(LDTK::worldBox.position);
+
+    background->useLayer = true;
+    background->layer = -10;
+    background->add<PinToCamera>();
+
     for (Entity *entity : GameManager::getAllObjects()) {
       if (entity->tag == "Ground") {
         entity->add<Collider>()->solid = true;
@@ -91,10 +116,19 @@ void loadGameScene() {
       }
 
       else if (entity->tag == "Lava") {
-        if (!playerCreated ||
-            (playerCreated && !GameManager::getEntities("Player")[0]
-                                   ->checkComponent<StanleyCup>())) {
-          entity->add<Kill>();
+        if (entity->checkComponent<Sprite>()) {
+          if (!playerCreated ||
+              (playerCreated && !GameManager::getEntities("Player")[0]
+                                     ->checkComponent<StanleyCup>())) {
+            entity->add<Kill>();
+          }
+
+          entity->get<Sprite>()->setAlpha(150);
+          entity->get<Sprite>()->preventWeirdBorder = false;
+
+        } else { // Is layer object
+          entity->useLayer = true;
+          entity->layer = 30;
         }
       }
 
@@ -106,6 +140,7 @@ void loadGameScene() {
       else if (entity->tag == "Star") {
         entity->add<Sprite>()->loadTexture("img/star.png");
         entity->get<entityBox>()->setScale({14, 14});
+        entity->add<Kill>();
 
         json fields = entity->get<LDTKEntity>()->entityJson["fieldInstances"];
         if (fields.size() <= 0)
@@ -117,7 +152,9 @@ void loadGameScene() {
                 entity->get<entityBox>()->getBox().getCenter();
 
             Vector2f end = {field["__value"]["cx"], field["__value"]["cy"]};
-            entity->add<MovePoint>()->endPoint = end * 16 + 8;
+            entity->add<MovePoint>()->endPoint = end * TILE_SIZE +
+                                                 (float)TILE_SIZE / 2 +
+                                                 LDTK::worldBox.position;
           } else if (field["__identifier"] == "moveSpeed") {
             entity->add<MovePoint>()->speed = (float)field["__value"];
           }
@@ -134,7 +171,7 @@ void loadGameScene() {
         if (entity->tag != abilityData.name)
           continue;
 
-        entity->add<Sprite>()->loadTexture("img/crocks.png", false);
+        entity->add<Sprite>()->loadTexture(abilityData.image, false);
         entity->add<Ability>();
         entity->get<Ability>()->abilityData = abilityData;
       }
@@ -144,12 +181,41 @@ void loadGameScene() {
   LDTK::loadLevel("78b44ad0-b0a0-11ee-b472-39fdb7fc8f8c");
 }
 
+class SpaceToStart : public ExtendedComponent {
+public:
+  void update() {
+    if (InputManager::checkInput("jumpTrigger")) {
+      loadGameScene();
+    }
+  }
+};
+
+void loadMenuScene() {
+  GameManager::destroyAll();
+  Camera::resetCamera();
+
+  Entity *background = GameManager::createEntity("Background");
+  background->add<Sprite>()->loadTexture("img/title.png");
+
+  background->get<entityBox>()->setScale(GameManager::gameWindowSize);
+  background->get<entityBox>()->setWithCenter({0, 0});
+
+  background->add<SpaceToStart>();
+}
+
 int main(int, char **) {
   GameManager::init();
 
-  loadGameScene();
+  GameManager::playSound("img/sound/08_Step_rock_02.wav");
+  Mix_Music *music = Mix_LoadMUS("img/sound/watch_the_sand.wav");
+  Mix_PlayMusic(music, -1);
+
+  // loadGameScene();
+  loadMenuScene();
 
   GameManager::doUpdateLoop();
+
+  Mix_FreeMusic(music);
 
   return 0;
 }

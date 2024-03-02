@@ -1,5 +1,7 @@
 #pragma once
+#include "AbilityComponents.h"
 #include "ExtendedComponent.h"
+#include "GameManager.h"
 #include "physicsBody.h"
 #include <Charlie2D.h>
 #include <cstdlib>
@@ -53,6 +55,56 @@ public:
   Vector2f lastEnterPosition = {0, 0};
 };
 
+class PlayerSoundManager : public ExtendedComponent {
+public:
+  void checkLava() {
+    for (Entity *lava : GameManager::getEntities("Lava")) {
+      if (entity->box->getBox().checkCollision(lava->box->getBox())) {
+        if (!touchingLava) {
+          touchingLava = true;
+          leftOrEnteredLava();
+        }
+        goto TOUCHING;
+      }
+    }
+
+    if (touchingLava) {
+      leftOrEnteredLava();
+      touchingLava = false;
+    }
+
+  TOUCHING:;
+  }
+
+  void update() override {
+    checkLava();
+    if (InputManager::checkInput("jumpTrigger")) {
+      GameManager::playSound("img/sound/30_Jump_03.wav");
+    }
+
+    if (InputManager::checkAxis().x != 0 &&
+        abs(get<physicsBody>()->velocity.y) <= 0.1) {
+      if (add<Scheduler>()->schedules.find("stepSound") ==
+          add<Scheduler>()->schedules.end()) {
+
+        GameManager::playSound("img/sound/08_Step_rock_02.wav");
+        add<Scheduler>()->addSchedule("stepSound", 150, []() {
+          GameManager::playSound("img/sound/08_Step_rock_02.wav");
+        });
+      }
+    } else {
+      add<Scheduler>()->removeSchedule("stepSound");
+    }
+  }
+
+  void leftOrEnteredLava() {
+    if (entity->checkComponent<StanleyCup>())
+      GameManager::playSound("img/sound/lava.wav");
+  }
+
+  bool touchingLava = false;
+};
+
 Entity *createPlayer(Entity *spawn) {
   Entity *player = GameManager::createEntity("Player");
   player->box->setPosition(spawn->box->getPosition());
@@ -93,6 +145,7 @@ Entity *createPlayer(Entity *spawn) {
   player->add<PinCameraTo>();
   player->add<PlayerAnimator>();
   player->add<PlayerLevelChange>();
+  player->add<PlayerSoundManager>();
 
   playerCreated = true;
   return player;
