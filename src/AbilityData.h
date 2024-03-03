@@ -10,6 +10,7 @@
 class Kill;
 class FlyingHead;
 
+// A struct for basic data for abilities
 struct AbilityData {
   AbilityData(std::string _name, std::string _description, std::string _image,
               std::function<void()> _onPickup)
@@ -29,6 +30,7 @@ struct AbilityData {
   std::function<void()> onPickup;
 };
 
+// A constant array holding each abities data
 const std::array<AbilityData, 3> ABILITY_DATA = {
     AbilityData(
         "HighJump", "Hold to jump higher", "img/HighJump.png",

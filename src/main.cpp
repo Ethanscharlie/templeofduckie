@@ -13,6 +13,7 @@ void loadMenuScene();
 
 const int TILE_SIZE = 16;
 
+// Component added to any tile that should kill the player
 class Kill : public ExtendedComponent {
 public:
   void start() override {}
@@ -28,6 +29,7 @@ public:
   }
 };
 
+// Component added to any entity that is meant to be picked up as an ability
 class Ability : public ExtendedComponent {
 public:
   void start() override {}
@@ -47,6 +49,7 @@ public:
   AbilityData abilityData;
 };
 
+// Allows for an entity to move between two points
 class MovePoint : public Component {
 public:
   void update(float deltaTime) override {
@@ -81,12 +84,26 @@ public:
   const float lowSpeed = 8;
 };
 
+// Pins an entity to the cameras position
 class PinToCamera : public Component {
   void update(float deltaTime) {
     entity->box->setWithCenter(Camera::getPosition());
   }
 };
 
+void createBackground() {
+  Entity *background = GameManager::createEntity("Background");
+  background->add<Sprite>()->loadTexture("img/background.png");
+
+  background->get<entityBox>()->setScale(LDTK::worldBox.size);
+  background->get<entityBox>()->setPosition(LDTK::worldBox.position);
+
+  background->useLayer = true;
+  background->layer = -10;
+  background->add<PinToCamera>();
+}
+
+// Loads in the main game
 void loadGameScene() {
   GameManager::destroyAll();
   Camera::resetCamera();
@@ -100,16 +117,10 @@ void loadGameScene() {
       entity->toDestroy = true;
     }
 
-    Entity *background = GameManager::createEntity("Background");
-    background->add<Sprite>()->loadTexture("img/background.png");
+    createBackground();
 
-    background->get<entityBox>()->setScale(LDTK::worldBox.size);
-    background->get<entityBox>()->setPosition(LDTK::worldBox.position);
-
-    background->useLayer = true;
-    background->layer = -10;
-    background->add<PinToCamera>();
-
+    // Loops through every entity in the game after the LDTK world is loaded to
+    // apply addiontal code to them
     for (Entity *entity : GameManager::getAllObjects()) {
       if (entity->tag == "Ground") {
         entity->add<Collider>()->solid = true;
@@ -141,6 +152,7 @@ void loadGameScene() {
           createPlayer(entity);
       }
 
+      // Adds the component to let the star move between two points
       else if (entity->tag == "Star") {
         entity->add<Sprite>()->loadTexture("img/star.png");
         entity->get<entityBox>()->setScale({14, 14});
@@ -170,7 +182,7 @@ void loadGameScene() {
         }
       }
 
-      // Abilities
+      // Checks if the entity is an ability
       for (AbilityData abilityData : ABILITY_DATA) {
         if (entity->tag != abilityData.name)
           continue;
@@ -208,6 +220,7 @@ public:
   }
 };
 
+// Loads the main screen 
 void loadMenuScene() {
   GameManager::destroyAll();
   Camera::resetCamera();

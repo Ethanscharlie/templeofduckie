@@ -2,6 +2,7 @@
 #include "AbilityData.h"
 #include <Charlie2D.h>
 
+// This is the drop panel that comes down when collecting an ability
 class ItemPanel : public Component {
 public:
   void start() override {

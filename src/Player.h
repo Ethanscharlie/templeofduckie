@@ -12,6 +12,7 @@
 bool playerCreated = false;
 Vector2f playerSize = {12, 25.6f};
 
+// Pins the camera to the player
 class PinCameraTo : public ExtendedComponent {
 public:
   void update() override {
@@ -19,21 +20,7 @@ public:
   }
 };
 
-class FlyingHead : public ExtendedComponent {
-public:
-  void update() override {
-    if (InputManager::keys[SDLK_e]) {
-      flying = !flying;
-    }
-
-    if (flying) {
-      get<physicsBody>()->velocity.y = -InputManager::checkVertical() * 100.0f;
-    }
-  }
-
-  bool flying = false;
-};
-
+// Handles the player animations and sprite changes
 class PlayerAnimator : public ExtendedComponent {
 public:
   void update() override {
@@ -62,6 +49,7 @@ public:
   }
 };
 
+// Handles the room change
 class PlayerLevelChange : public ExtendedComponent {
 public:
   void update() override {
@@ -78,11 +66,13 @@ public:
   Vector2f lastEnterPosition = {0, 0};
 };
 
+// Holds a list of collected abilities so they don't get spawned again
 class PlayerAbilityCollector : public ExtendedComponent {
 public:
   std::vector<AbilityData> abilities;
 };
 
+// Handles sounds related to the player
 class PlayerSoundManager : public ExtendedComponent {
 public:
   void checkLava() {
@@ -137,6 +127,7 @@ public:
   bool touchingLava = false;
 };
 
+// Creates the player entity and adds the needed compnents
 Entity *createPlayer(Entity *spawn) {
   Entity *player = GameManager::createEntity("Player");
   player->box->setPosition(spawn->box->getPosition());
