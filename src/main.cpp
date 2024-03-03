@@ -6,6 +6,8 @@
 #include "InputManager.h"
 #include "Player.h"
 
+#include "ItemPanel.h"
+
 void loadGameScene();
 void loadMenuScene();
 
@@ -36,6 +38,8 @@ public:
     if (entity->box->getBox().checkCollision(player->box->getBox())) {
       abilityData.onPickup();
       GameManager::playSound("img/sound/win sound 1-2.wav");
+      createItemPanel(abilityData);
+      player->get<PlayerAbilityCollector>()->abilities.push_back(abilityData);
       entity->toDestroy = true;
     }
   }
@@ -171,6 +175,20 @@ void loadGameScene() {
         if (entity->tag != abilityData.name)
           continue;
 
+        // Checks if ability has already been collected
+        if (playerCreated) {
+          std::vector<AbilityData> playerAbilitiesList =
+              GameManager::getEntities("Player")[0]
+                  ->get<PlayerAbilityCollector>()
+                  ->abilities;
+          for (AbilityData playerAbilityData : playerAbilitiesList) {
+            if (abilityData.name == playerAbilityData.name) {
+              entity->toDestroy = true;
+              break;
+            }
+          }
+        }
+
         entity->add<Sprite>()->loadTexture(abilityData.image, false);
         entity->add<Ability>();
         entity->get<Ability>()->abilityData = abilityData;
@@ -210,7 +228,6 @@ int main(int, char **) {
   Mix_Music *music = Mix_LoadMUS("img/sound/watch_the_sand.wav");
   Mix_PlayMusic(music, -1);
 
-  // loadGameScene();
   loadMenuScene();
 
   GameManager::doUpdateLoop();

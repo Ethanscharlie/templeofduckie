@@ -8,6 +8,7 @@
 #include "AbilityComponents.h"
 
 class Kill;
+class FlyingHead;
 
 struct AbilityData {
   AbilityData(std::string _name, std::string _description, std::string _image,
@@ -28,7 +29,7 @@ struct AbilityData {
   std::function<void()> onPickup;
 };
 
-const std::array<AbilityData, 2> ABILITY_DATA = {
+const std::array<AbilityData, 3> ABILITY_DATA = {
     AbilityData(
         "HighJump", "Hold to jump higher", "img/HighJump.png",
         []() {
@@ -44,4 +45,8 @@ const std::array<AbilityData, 2> ABILITY_DATA = {
                       entity->remove<Kill>();
                   }
                 }),
+
+    AbilityData(
+        "FlyingHead", "Press E", "img/head1616.png",
+        []() { GameManager::getEntities("Player")[0]->add<FlyingHead>(); }),
 };
