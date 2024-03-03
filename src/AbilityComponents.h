@@ -9,6 +9,7 @@ class FlyingHead : public ExtendedComponent {
 public:
   void update() override {
     if (InputManager::keys[SDLK_e]) {
+      GameManager::playSound("img/sound/30_Jump_03.wav");
       flying = !flying;
     }
 
@@ -19,4 +20,3 @@ public:
 
   bool flying = false;
 };
-
