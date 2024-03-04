@@ -170,8 +170,6 @@ Entity *createPlayer(Entity *spawn) {
   player->add<PlayerSoundManager>();
   player->add<PlayerAbilityCollector>();
 
-  player->add<FlyingHead>();
-
   playerCreated = true;
   return player;
 }

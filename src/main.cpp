@@ -93,14 +93,14 @@ class PinToCamera : public Component {
 
 void createBackground() {
   Entity *background = GameManager::createEntity("Background");
-  background->add<Sprite>()->loadTexture("img/background.png");
+  background->add<Sprite>()->loadTexture("img/backgroundwall.png");
 
-  background->get<entityBox>()->setScale(LDTK::worldBox.size);
+  // background->get<entityBox>()->setScale(LDTK::worldBox.size);
   background->get<entityBox>()->setPosition(LDTK::worldBox.position);
 
   background->useLayer = true;
   background->layer = -10;
-  background->add<PinToCamera>();
+  // background->add<PinToCamera>();
 }
 
 // Loads in the main game

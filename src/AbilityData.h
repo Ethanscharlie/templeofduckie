@@ -31,7 +31,7 @@ struct AbilityData {
 };
 
 // A constant array holding each abities data
-const std::array<AbilityData, 4> ABILITY_DATA = {
+const std::array<AbilityData, 5> ABILITY_DATA = {
     AbilityData(
         "HighJump", "Hold to jump higher", "img/HighJump.png",
         []() {
@@ -53,4 +53,9 @@ const std::array<AbilityData, 4> ABILITY_DATA = {
         []() { GameManager::getEntities("Player")[0]->add<FlyingHead>(); }),
 
     AbilityData("TheDuckie", "The End, Thanks for playing", "img/duck.png", []() {}),
+    AbilityData(
+        "DoubleJump", "Jump again!", "img/DoubleJump.png",
+        []() {
+          GameManager::getEntities("Player")[0]->get<JumpMan>()->jumps = 2;
+        }),
 };
